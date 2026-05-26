@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="cs">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>EAN Scanner</title>
+
+<meta name="apple-mobile-web-app-capable"
+      content="yes">
+
+<meta name="apple-mobile-web-app-status-bar-style"
+      content="default">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+      rel="stylesheet">
+
+<style>
+
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+}
+
+body{
+  margin:0;
+  padding:20px;
+  font-family:'Inter',sans-serif;
+  background:#f3f6fb;
+  color:#1e293b;
+  min-height:100vh;
+}
+
+.container{
+  width:100%;
+  max-width:520px;
+  margin:auto;
+}
+
+.header{
+  text-align:center;
+  margin-bottom:24px;
+}
+
+.logo{
+  width:78px;
+  height:78px;
+  margin:auto;
+  border-radius:24px;
+  background:
+    linear-gradient(135deg,#2563eb,#38bdf8);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:36px;
+  color:white;
+  box-shadow:
+    0 12px 30px rgba(37,99,235,0.25);
+}
+
+h1{
+  margin:18px 0 8px;
+  font-size:34px;
+  font-weight:800;
+  letter-spacing:-1px;
+}
+
+.subtitle{
+  color:#64748b;
+  font-size:15px;
+}
+
+#reader{
+  overflow:hidden;
+  border-radius:28px;
+  background:black;
+  border:3px solid white;
+  box-shadow:
+    0 12px 35px rgba(0,0,0,0.12);
+}
+
+.card{
+  margin-top:22px;
+  background:white;
+  border-radius:24px;
+  padding:24px;
+  box-shadow:
+    0 10px 30px rgba(0,0,0,0.08);
+}
+
+.label{
+  color:#64748b;
+  font-size:14px;
+  margin-bottom:10px;
+}
+
+#result{
+  font-size:28px;
+  font-weight:800;
+  color:#2563eb;
+  word-break:break-all;
+  letter-spacing:-0.5px;
+}
+
+.status{
+  margin-top:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:#475569;
+  font-size:15px;
+  font-weight:600;
+}
+
+.dot{
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  background:#22c55e;
+  box-shadow:
+    0 0 14px rgba(34,197,94,0.6);
+}
+
+.buttons{
+  margin-top:22px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+button{
+  width:100%;
+  border:none;
+  border-radius:18px;
+  padding:18px 22px;
+  font-size:17px;
+  font-weight:700;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+button:active{
+  transform:scale(0.98);
+}
+
+.primary{
+  background:
+    linear-gradient(135deg,#2563eb,#38bdf8);
+  color:white;
+  box-shadow:
+    0 10px 25px rgba(37,99,235,0.25);
+}
+
+.secondary{
+  background:white;
+  color:#334155;
+  border:
+    2px solid #dbe4f0;
+}
+
+.footer{
+  margin-top:24px;
+  text-align:center;
+  color:#94a3b8;
+  font-size:13px;
+}
+
+.success{
+  color:#16a34a !important;
+}
+
+.error{
+  color:#dc2626 !important;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="header">
+
+    <div class="logo">
+      📦
+    </div>
+
+    <h1>EAN Scanner</h1>
+
+    <div class="subtitle">
+      Skenování EAN / EAN128 do Google Sheets
+    </div>
+
+  </div>
+
+  <div id="reader"></div>
+
+  <div class="card">
+
+    <div class="label">
+      Poslední načtený kód
+    </div>
+
+    <div id="result">
+      ---
+    </div>
+
+    <div class="status">
+
+      <div class="dot"></div>
+
+      <div id="status">
+        Připraveno ke skenování
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="buttons">
+
+    <button class="primary"
+            onclick="startScanner()">
+
+      📷 Spustit kameru
+
+    </button>
+
+    <button class="secondary"
+            onclick="stopScanner()">
+
+      ⏹ Zastavit kameru
+
+    </button>
+
+  </div>
+
+  <div class="footer">
+    Mobile Barcode Scanner
+  </div>
+
+</div>
+
+<script>
+
+const API_URL =
+'https://script.google.com/macros/s/AKfycbzFx_ztPkFEEG8jDZ4zt_4YhcDZqhiOEq2pR7dOO8LHjynNScgRNre7Waou7BGD4XMgDg/exec';
+
+let html5QrCode;
+let scannerRunning = false;
+
+let lastCode = '';
+let lastScan = 0;
+
+const beep = new Audio(
+  'https://actions.google.com/sounds/v1/alarms/beep_short.ogg'
+);
+
+beep.preload = 'auto';
+beep.volume = 1;
+
+function setStatus(text,type='normal'){
+
+  const status =
+    document.getElementById('status');
+
+  status.innerText = text;
+
+  status.className = '';
+
+  if(type === 'success'){
+    status.classList.add('success');
+  }
+
+  if(type === 'error'){
+    status.classList.add('error');
+  }
+
+}
+
+async function startScanner(){
+
+  if(scannerRunning){
+    return;
+  }
+
+  try{
+
+    scannerRunning = true;
+
+    try{
+      await beep.play();
+      beep.pause();
+      beep.currentTime = 0;
+    }catch(e){}
+
+    setStatus('Spouštím kameru...');
+
+    html5QrCode =
+      new Html5Qrcode("reader");
+
+    await html5QrCode.start(
+
+      {
+        facingMode:{
+          exact:"environment"
+        }
+      },
+
+      {
+        fps:10,
+
+        qrbox:{
+          width:280,
+          height:140
+        },
+
+        aspectRatio:1.7778
+      },
+
+      async(decodedText)=>{
+
+        const now = Date.now();
+
+        if(
+          decodedText !== lastCode ||
+          now - lastScan > 5000
+        ){
+
+          lastCode = decodedText;
+          lastScan = now;
+
+          document.getElementById('result')
+            .innerText = decodedText;
+
+          if(navigator.vibrate){
+
+            navigator.vibrate([
+              500,
+              150,
+              500,
+              150,
+              800
+            ]);
+
+          }
+
+          try{
+
+            beep.currentTime = 0;
+
+            await beep.play();
+
+          }catch(e){
+
+            console.log(e);
+
+          }
+
+          setStatus('Ukládám do tabulky...');
+
+          try{
+
+            await fetch(API_URL,{
+
+              method:'POST',
+
+              headers:{
+                'Content-Type':'application/json'
+              },
+
+              body:JSON.stringify({
+                code:decodedText
+              })
+
+            });
+
+            setStatus(
+              'Uloženo ✔',
+              'success'
+            );
+
+          }catch(e){
+
+            console.error(e);
+
+            setStatus(
+              'Chyba zápisu',
+              'error'
+            );
+
+          }
+
+        }
+
+      }
+
+    );
+
+    setStatus(
+      'Kamera spuštěna',
+      'success'
+    );
+
+  }catch(e){
+
+    console.error(e);
+
+    scannerRunning = false;
+
+    setStatus(
+      'Chyba kamery',
+      'error'
+    );
+
+    alert(
+      'Nepodařilo se otevřít kameru.\n\n' +
+      'Na iPhone otevři aplikaci v Safari a povol kameru.'
+    );
+
+  }
+
+}
+
+async function stopScanner(){
+
+  try{
+
+    if(html5QrCode && scannerRunning){
+
+      await html5QrCode.stop();
+
+      scannerRunning = false;
+
+      setStatus(
+        'Kamera zastavena'
+      );
+
+    }
+
+  }catch(e){
+
+    console.error(e);
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
