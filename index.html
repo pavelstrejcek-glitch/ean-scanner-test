@@ -372,17 +372,17 @@ async function startScanner(){
 
             await fetch(API_URL,{
 
-              method:'POST',
+  method:'POST',
 
-              headers:{
-                'Content-Type':'application/json'
-              },
+  headers:{
+    'Content-Type':'application/json'
+  },
 
-              body:JSON.stringify({
-                code:decodedText
-              })
+  body:JSON.stringify({
+    code:decodedText
+  })
 
-            });
+});
 
             setStatus(
               'Uloženo ✔',
